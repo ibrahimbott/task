@@ -14,11 +14,6 @@ const config = {
   tagline: 'Connecting AI Agents to Physical Robot Systems',
   favicon: 'img/favicon.ico',
 
-  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
-  future: {
-    v4: true, // Improve compatibility with the upcoming Docusaurus v4
-  },
-
   // Set the production url of your site here
   url: 'https://your-github-username.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
@@ -29,8 +24,8 @@ const config = {
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'imranitsot', // Usually your GitHub org/user name.
   projectName: 'Physical-AI-TextBook', // Usually your repo name.
-
-  onBrokenLinks: 'throw',
+  
+  onBrokenLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you

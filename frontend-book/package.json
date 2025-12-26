@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "docusaurus": "docusaurus",
-    "start": "docusaurus start",
-    "build": "docusaurus build",
+    "start": "node --max-old-space-size=6144 ./node_modules/@docusaurus/core/bin/docusaurus.mjs start",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=6144 docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
@@ -26,7 +26,8 @@
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.9.2",
-    "@docusaurus/types": "3.9.2"
+    "@docusaurus/types": "3.9.2",
+    "cross-env": "^10.1.0"
   },
   "browserslist": {
     "production": [
@@ -40,7 +41,7 @@
       "last 5 safari version"
     ]
   },
- "engines": {
-    "node": "24.x"
+  "engines": {
+    "node": "22.x"
   }
 }

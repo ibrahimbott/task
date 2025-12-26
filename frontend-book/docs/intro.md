@@ -28,4 +28,4 @@ This documentation is structured as a linear course, but serves equally well as 
 
 ## Getting Started
 
-Select **[Module 1](./module-1-ros2-nervous-system/index)** from the sidebar to begin your journey into the nervous system of robots.
+Select **[Module 1: The Nervous System (ROS 2)](./module-1-ros2-nervous-system)** from the sidebar to begin your journey into the nervous system of robots.

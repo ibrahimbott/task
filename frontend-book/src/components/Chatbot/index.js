@@ -29,10 +29,10 @@ const Chatbot = () => {
         setLoading(true);
 
         try {
-            // Determine API URL: Use env var, or localhost for dev, or relative /api for prod
+            // Determine API URL: defaulting to relative path /api/chat which Vercel rewrites to backend
             const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-                ? 'http://localhost:8000/chat'
-                : '/api/chat';
+                ? 'http://localhost:8000/api/chat' // Direct local backend
+                : '/api/chat'; // Production via Vercel rewrite
 
             const response = await fetch(apiUrl, {
                 method: 'POST',

@@ -16,10 +16,10 @@ Building the **Physical AI Textbook** was not just about writing comparisons of 
 
 We structured the book around the anatomy of a robot, breaking it down into four key pillars:
 
-1.  **The Nervous System**: Covered in [Module 1](/docs/module-1-ros2-nervous-system/index), this explores ROS 2 as the distributed data bus.
-2.  **The Body**: In [Module 4](/docs/hardware-basics/module-3-hardware) and [Module 7](/docs/humanoid-design/module-6-humanoid-design), we dive into the nuts and bolts—literally.
-3.  **The Twin**: [Module 2](/docs/module-2-digital-twin-simulation/index) and [Module 3](/docs/simulation/module-2-simulation) emphasize that simulation is key to safety.
-4.  **The Brain**: Finally, [Module 5](/docs/vla-systems/module-4-vla-foundations) and [Module 6](/docs/advanced-ai-control/module-5-advanced-ai) bring it all to life with VLA and RL.
+1.  **The Nervous System**: Covered in **[Module 1: The Nervous System (ROS 2)](/docs/module-1-ros2-nervous-system)**, this explores ROS 2 as the distributed data bus.
+2.  **The Digital Twin**: In **[Module 2: The Digital Twin (Simulation)](/docs/module-2-digital-twin-simulation)**, we emphasize that simulation is key to safety.
+3.  **The Body**: In **[Module 3: Hardware Basics](/docs/hardware-basics/module-3-hardware)** and **[Module 4: Humanoid Design](/docs/humanoid-design/module-4-humanoid-design)**, we dive into the nuts and bolts—literally.
+4.  **The Brain**: Finally, **[Module 5: VLA Foundations](/docs/vla-systems/module-5-vla-foundations)** and **[Module 6: Advanced AI Control](/docs/advanced-ai-control/module-6-advanced-ai)** bring it all to life with VLA and RL.
 
 ## Visual Learning
 

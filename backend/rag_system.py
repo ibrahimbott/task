@@ -12,17 +12,17 @@ import argparse
 import time
 import uuid
 import traceback
+import asyncio
 from typing import List, Optional, Tuple, Dict
 
 import cohere
 import httpx
-import openai
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from openai import OpenAI
+from openai import AsyncOpenAI
 from pydantic import BaseModel
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -37,8 +37,6 @@ logging.basicConfig(
 )
 
 # Configuration
-QDRANT_URL = os.getenv("QDRANT_URL") or os.getenv("QDRANT_API_KEY") # Fallback handled in logic if needed, but usually URL is distinct
-# Fix: Ensure URL is actually a URL. The user provided QDRANT_URL in env.
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
@@ -56,22 +54,21 @@ MODEL_NOTICE: Optional[str] = None
 try:
     qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
     cohere_client = cohere.Client(COHERE_API_KEY)
-    openai_client = OpenAI(
+    openai_client = AsyncOpenAI(
         api_key=GOOGLE_API_KEY,
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
     )
 except Exception as e:
     logging.error(f"Failed to initialize clients: {e}")
-    # We continue, but some functions might fail.
 
-def refresh_model_selection(force: bool = False) -> Tuple[str, Optional[str]]:
+async def refresh_model_selection(force: bool = False) -> Tuple[str, Optional[str]]:
     global _available_models_cache, ACTIVE_MODEL, MODEL_NOTICE
 
     if _available_models_cache and not force:
         return ACTIVE_MODEL, MODEL_NOTICE
 
     try:
-        models_response = openai_client.models.list()
+        models_response = await openai_client.models.list()
         _available_models_cache = [model.id for model in models_response.data]
     except Exception as error:
         logging.error("Failed to list Gemini models: %s", error, exc_info=True)
@@ -118,7 +115,8 @@ def refresh_model_selection(force: bool = False) -> Tuple[str, Optional[str]]:
     return ACTIVE_MODEL, MODEL_NOTICE
 
 # Ensure models are loaded on startup
-refresh_model_selection()
+# We can't await this at module level, so we just let the first request handle it or create a task
+# asyncio.create_task(refresh_model_selection()) # Requires loop
 
 # --- FastAPI app ---
 app = FastAPI(title="Physical AI Textbook Chatbot API")
@@ -136,7 +134,7 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-@app.get("/")
+@app.get("/api")
 async def read_root():
     if os.path.exists(os.path.join(static_dir, "index.html")):
         return FileResponse(os.path.join(static_dir, "index.html"))
@@ -169,7 +167,7 @@ def retrieve_knowledge(query: str, top_k: int = TOP_K) -> dict:
         # Embed the query using Cohere
         response = cohere_client.embed(
             texts=[query],
-            model='embed-multilingual-v3.0', # Changed to multilingual to match ingestion
+            model='embed-multilingual-v3.0',
             input_type='search_query'
         )
         
@@ -177,7 +175,6 @@ def retrieve_knowledge(query: str, top_k: int = TOP_K) -> dict:
         
         # Search Qdrant logic (Robust)
         search_response = None
-        search_method_used: Optional[str] = None
         
         # Try query_points first (newer client)
         try:
@@ -187,7 +184,6 @@ def retrieve_knowledge(query: str, top_k: int = TOP_K) -> dict:
                 limit=top_k,
                 with_payload=True
              )
-             search_method_used = "query_points"
         except Exception:
              # Fallback to search
             try:
@@ -197,7 +193,6 @@ def retrieve_knowledge(query: str, top_k: int = TOP_K) -> dict:
                     limit=top_k,
                     with_payload=True
                 )
-                search_method_used = "search"
             except Exception as e:
                  logging.error(f"All Qdrant search methods failed: {e}")
                  raise
@@ -205,10 +200,9 @@ def retrieve_knowledge(query: str, top_k: int = TOP_K) -> dict:
         # Normalize results
         search_results = getattr(search_response, "points", None)
         if search_results is None:
-             search_results = getattr(search_response, "result", search_response) # For raw list or older response
+             search_results = getattr(search_response, "result", search_response)
         if not isinstance(search_results, list):
              search_results = list(search_results)
-
         
         # Format results
         contexts = []
@@ -230,13 +224,13 @@ def retrieve_knowledge(query: str, top_k: int = TOP_K) -> dict:
                 score = result.get("score")
                 
             sources.append({
-                'title': payload.get('source', 'Unknown section'), # Changed 'title'/'module' to 'source' which is what we ingest
+                'title': payload.get('source', 'Unknown section'),
                 'module': payload.get('source', 'Unknown module'), 
                 'file_path': payload.get('source', ''),
                 'score': score
             })
         
-        combined_context = "\n\n---\n\n".join(contexts)
+        combined_context = "\\n\\n---\\n\\n".join(contexts)
         
         return {
             'context': combined_context,
@@ -283,18 +277,18 @@ SYSTEM_PROMPT = """You are the AI Tutor for the **Physical AI & Humanoid Robotic
 5. Be concise but thorough. Use bullet points and code examples when relevant.
 """
 
-def run_agent(user_message: str, conversation_history: List[dict]) -> dict:
+async def run_agent(user_message: str, conversation_history: List[dict]) -> dict:
     """
-    Runs the OpenAI agent with function calling capabilities
+    Runs the OpenAI agent with function calling capabilities (ASYNC)
     """
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(conversation_history[-5:])
     messages.append({"role": "user", "content": user_message})
     
-    model_in_use, model_notice = refresh_model_selection()
+    model_in_use, model_notice = await refresh_model_selection()
 
     try:
-        response = openai_client.chat.completions.create(
+        response = await openai_client.chat.completions.create(
             model=model_in_use,
             messages=messages,
             tools=[{"type": "function", "function": RETRIEVE_KNOWLEDGE_FUNCTION}],
@@ -318,7 +312,9 @@ def run_agent(user_message: str, conversation_history: List[dict]) -> dict:
              function_args = {}
              
         if function_name == "retrieve_knowledge":
-            function_result = retrieve_knowledge(
+            # Run the synchronous retrieval in a thread to keep loop unblocked
+            function_result = await asyncio.to_thread(
+                retrieve_knowledge,
                 query=function_args.get('query', user_message),
                 top_k=function_args.get('top_k', TOP_K)
             )
@@ -331,7 +327,7 @@ def run_agent(user_message: str, conversation_history: List[dict]) -> dict:
             })
             
             try:
-                final_response = openai_client.chat.completions.create(
+                final_response = await openai_client.chat.completions.create(
                     model=model_in_use,
                     messages=messages,
                     temperature=0.0,
@@ -339,7 +335,7 @@ def run_agent(user_message: str, conversation_history: List[dict]) -> dict:
                 )
                 final_text = final_response.choices[0].message.content
                 if model_notice:
-                    final_text += f"\n\nℹ️ {model_notice}"
+                    final_text += f"\\n\\nℹ️ {model_notice}"
                 return {'response': final_text, 'sources': function_result['sources']}
             except Exception as e:
                  return {'response': f"Follow-up failed: {e}", 'sources': []}
@@ -351,8 +347,7 @@ def run_agent(user_message: str, conversation_history: List[dict]) -> dict:
 def perform_ingestion() -> str:
     print(f"Starting ingestion from: {DOCS_DIR}")
     
-    files = glob.glob(os.path.join(DOCS_DIR, "**/*.md"), recursive=True) + \
-            glob.glob(os.path.join(DOCS_DIR, "**/*.mdx"), recursive=True)
+    files = glob.glob(os.path.join(DOCS_DIR, "**/*.md"), recursive=True) +             glob.glob(os.path.join(DOCS_DIR, "**/*.mdx"), recursive=True)
             
     if not files:
         return "No markdown files found."
@@ -415,7 +410,6 @@ def perform_ingestion() -> str:
         batch_metas = all_metas[i : i + batch_size]
         
         try:
-            # Note: Using embed-multilingual-v3.0 as per instructions
             response = cohere_client.embed(
                 texts=batch_chunks,
                 model="embed-multilingual-v3.0",
@@ -447,22 +441,22 @@ def perform_ingestion() -> str:
 
 # --- API Endpoints ---
 
-@app.post("/ingest", response_model=IngestResponse)
+@app.post("/api/ingest", response_model=IngestResponse)
 async def api_ingest():
     if not qdrant_client:
          raise HTTPException(status_code=500, detail="Database client not initialized")
     
     try:
-        result = perform_ingestion()
+        result = await asyncio.to_thread(perform_ingestion)
         return IngestResponse(status="success", message=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/api/chat", response_model=ChatResponse)
 async def api_chat(request: ChatRequest):
     try:
         history = [msg.model_dump() for msg in request.conversation_history]
-        result = run_agent(request.message, history)
+        result = await run_agent(request.message, history)
         return ChatResponse(response=result['response'], sources=result['sources'])
     except Exception as e:
         logging.error("Chat endpoint failed: %s", e)
@@ -481,11 +475,14 @@ def main():
         print(perform_ingestion())
     elif args.ask:
         print(f"Question: {args.ask}")
-        result = run_agent(args.ask, [])
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(run_agent(args.ask, []))
         print(f"Answer: {result['response']}")
     else:
         print("Starting API Server on port 8000...")
-        uvicorn.run("rag_system:app", host="0.0.0.0", port=8000)
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
 
 if __name__ == "__main__":
     main()

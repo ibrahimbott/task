@@ -57,7 +57,7 @@ export default function Home() {
         {
             title: 'The Nervous System',
             description: 'ROS 2 Middleware, Real-time Communication (DDS), and Node Graphs.',
-            link: '/docs/module-1-ros2-nervous-system/index',
+            link: '/docs/module-1-ros2-nervous-system',
             // Using existing SVGs or just abstract for now if images run out
             imageUrl: 'img/ros2_nervous.png'
         },
@@ -76,7 +76,7 @@ export default function Home() {
         {
             title: 'The Digital Twin',
             description: 'Gazebo & Unity Simulation, URDF Modeling, and Sim-to-Real.',
-            link: '/docs/simulation/module-2-simulation',
+            link: '/docs/module-2-digital-twin-simulation',
             imageUrl: 'img/simulation_split.png'
         },
     ];
