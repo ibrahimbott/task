@@ -1,5 +1,11 @@
 {
     "version": 2,
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/index.py"
+        }
+    ],
     "builds": [
         {
             "src": "frontend-book/package.json",
@@ -11,16 +17,6 @@
         {
             "src": "api/index.py",
             "use": "@vercel/python"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/api/(.*)",
-            "dest": "/api/index.py"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/frontend-book/$1"
         }
     ],
     "env": {
